@@ -16,6 +16,7 @@
 #
 import webapp2
 import re
+import cgi
 
 form = """
 <!DOCTYPE html>
@@ -35,7 +36,7 @@ form = """
                 <tr>
                     <td><label for="username">Username</label></td>
                     <td>
-                        <input name="username" type="text" value="" required>
+                        <input name="username" type="text" value="%(e)s" required>
                         <span class="error">%(a)s</span>
                     </td>
                 </tr>
@@ -56,7 +57,7 @@ form = """
                 <tr>
                     <td><label for="email">Email (optional)</label></td>
                     <td>
-                        <input name="email" type="email" value="">
+                        <input name="email" type="email" value="%(f)s">
                         <span class="error">%(d)s</span>
                     </td>
                 </tr>
@@ -65,6 +66,15 @@ form = """
         </form>
     </body>
 </html>"""
+
+welcome_form = """
+<head>
+    <title>Congratulations!</title>
+</head>
+<body>
+    <h1>Welcome, %(e)s!</h1>
+</body>
+"""
 
 USER_RE = re.compile(r"^[a-zA-Z0-9_-]{3,20}$")
 def valid_username(username):
@@ -81,37 +91,58 @@ def valid_email(email):
 class Signup(webapp2.RequestHandler):
 
     def get(self):
-        self.response.write(form % {"a": "", "b": "", "c": "", "d": ""})
+        self.response.write(form % {"a": "", "b": "", "c": "", "d": "", "e": "", "f": ""})
 
     def post(self):
-        have_error = False
+        have_error1 = False
+        have_error2 = False
+        have_error3 = False
+        have_error4 = False
+        error_username = ""
+        error_password = ""
+        error_verify = ""
+        error_email = ""
         username = self.request.get('username')
         password = self.request.get('password')
         verify = self.request.get('verify')
         email = self.request.get('email')
 
-        params = dict(username = username,
-                      email = email)
-
         if not valid_username(username):
-            params['error_username'] = "That's not a valid username."
-            have_error = True
+            error_username = "That's not a valid username."
+            have_error1 = True
 
         if not valid_password(password):
-            params['error_password'] = "That wasn't a valid password."
-            have_error = True
+            error_password = "That wasn't a valid password."
+            have_error2 = True
         elif password != verify:
-            params['error_verify'] = "Your passwords didn't match."
-            have_error = True
+            error_verify = "Your passwords didn't match."
+            have_error3 = True
 
         if not valid_email(email):
-            params['error_email'] = "That's not a valid email."
-            have_error = True
+            error_email = "That's not a valid email."
+            have_error4 = True
 
-        if have_error:
-            self.response.write(form % {"a": "", "b": "", "c": "", "d": ""})
+        if have_error1 or have_error2 or have_error3 or have_error4:
+            username = cgi.escape(username, quote = True)
+            email = cgi.escape(email, quote = True)
+            self.response.write(
+                form % {
+                "a": error_username,
+                "b": error_password,
+                "c": error_verify,
+                "d": error_email,
+                "e": username,
+                "f": email})
+
         else:
-            self.response.write("Welcome!")
+            self.redirect('/Welcome?username={}'.format(username))
 
-app = webapp2.WSGIApplication([('/', Signup)],
+class WelcomePage(webapp2.RequestHandler):
+
+    def get(self):
+        username = self.request.get('username')
+        self.response.write(welcome_form % {'e': username})
+
+app = webapp2.WSGIApplication([('/', Signup),
+                               ('/Welcome', WelcomePage)],
                               debug=True)
